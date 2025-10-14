@@ -1,0 +1,374 @@
+@Library('irontec-jenkins-library@main') _
+
+/**
+ * Example Jenkinsfile using the Irontec Jenkins Shared Library
+ * 
+ * This shows a complete pipeline example with all the common patterns.
+ * Customize the environment variables for your specific project.
+ */
+
+pipeline {
+
+    agent any
+
+    options {
+        timeout(time: 25, unit: 'MINUTES')
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(
+            logRotator(
+                artifactDaysToKeepStr: '10',
+                artifactNumToKeepStr: '10',
+                daysToKeepStr: '10',
+                numToKeepStr: '10'
+            )
+        )
+    }
+
+    environment {
+        // Configure these for your project
+        GITHUB_CREDENTIALS = 'github-credentials-id'
+        GITHUB_CONTEXT_PREFIX = 'my-project'  // e.g., 'my-project-ci'
+        MATTERMOST_CHANNEL = '#my-project-notifications'  // Optional
+        APP_ENV = "dev"
+        DOCKER_BUILDKIT = 1
+        
+        // Using shared library functions
+        DOCKER_TAG = getDockerTag()
+        BRANCH_NAME = getBranchName()
+        BASE_BRANCH = getBaseBranch()
+        JIRA_TICKET = getJiraTicket()
+        HASH_BACK = getCurrentHash("backend")
+        HASH_FRONT = getCurrentHash("frontend")
+        HASH_FILE = 
+            "${JENKINS_HOME}/caches/${JOB_NAME}/hashes.txt"
+        MAX_HASHES = 100
+    }
+
+    stages {
+        // --------------------------------------------------------------------
+        // Update PR information
+        // --------------------------------------------------------------------
+        stage('Merge Request') {
+            agent any
+            when {
+                expression {
+                    env.JIRA_TICKET
+                }
+            }
+            steps {
+                script {
+                    // Using shared library functions
+                    jiraUpdateCustomFields('yourcompany.atlassian.net')
+                    githubUpdatePullRequestTitle()
+                }
+            }
+        }
+
+        // --------------------------------------------------------------------
+        // Build Docker images
+        // --------------------------------------------------------------------
+        stage('Build Images') {
+            agent any
+            steps {
+                script {
+                    docker.build(
+                        "myapp-testing:${DOCKER_TAG}",
+                        "-f tests/Dockerfile ."
+                    )
+                }
+            }
+        }
+
+        // --------------------------------------------------------------------
+        // Generic project tests
+        // --------------------------------------------------------------------
+        stage('Generic') {
+            agent {
+                docker {
+                   image "myapp-testing:${DOCKER_TAG}"
+                   args '--volume ${WORKSPACE}:/opt/myapp'
+                   reuseNode true
+                }
+            }
+            steps {
+                sh "./bin/test-commit-tags origin/${env.BASE_BRANCH}"
+            }
+        }
+
+        // --------------------------------------------------------------------
+        // Check if tests are required for current sources
+        // --------------------------------------------------------------------
+        stage('Check Cache') {
+            agent any
+            when {
+                not {
+                    anyOf {
+                        // Using shared library functions
+                        expression { hasLabel("force-backend-tests") }
+                        expression { hasLabel("force-frontend-tests") }
+                        expression { hasLabel("force-all-tests") }
+                        branch "main"
+                    }
+                }
+            }
+            steps {
+                script {
+                    // Using shared library functions
+                    env.CACHED_PIPELINE_BACK = 
+                        isHashTested(env.HASH_BACK)
+                    echo """
+                        Backend Hash ${env.HASH_BACK} tested before? \
+                        ${env.CACHED_PIPELINE_BACK}
+                    """
+                    
+                    env.CACHED_PIPELINE_FRONT = 
+                        isHashTested(env.HASH_FRONT)
+                    echo """
+                        Frontend Hash ${env.HASH_FRONT} tested before? \
+                        ${env.CACHED_PIPELINE_FRONT}
+                    """
+                }
+            }
+        }
+
+        // --------------------------------------------------------------------
+        // Backend Testing stage
+        // --------------------------------------------------------------------
+        stage('Backend') {
+            when {
+                allOf {
+                    expression { env.CACHED_PIPELINE_BACK != "true" }
+                    anyOf {
+                        // Using shared library functions
+                        expression { hasLabel("force-backend-tests") }
+                        expression { hasLabel("force-all-tests") }
+                        expression { hasCommitTag("backend:") }
+                        expression { hasCommitTag("tests:") }
+                        expression { hasCommitTag("schema:") }
+                        branch "main"
+                    }
+                }
+            }
+            parallel {
+                stage ('Linting') {
+                    agent {
+                        docker {
+                            image "myapp-testing:${DOCKER_TAG}"
+                            args '--volume ${WORKSPACE}:/opt/myapp'
+                            reuseNode true
+                        }
+                    }
+                    steps {
+                        sh './bin/test-lint'
+                    }
+                    post {
+                        // Using shared library functions
+                        success { notifySuccessGithub() }
+                        failure { notifyFailureGithub() }
+                    }
+                }
+                
+                stage ('Unit Tests') {
+                    agent {
+                        docker {
+                            image "myapp-testing:${DOCKER_TAG}"
+                            args '--volume ${WORKSPACE}:/opt/myapp'
+                            reuseNode true
+                        }
+                    }
+                    steps {
+                        sh './bin/test-unit'
+                    }
+                    post {
+                        // Using shared library functions
+                        success { notifySuccessGithub() }
+                        failure { notifyFailureGithub() }
+                    }
+                }
+                
+                stage ('Integration Tests') {
+                    agent {
+                        docker {
+                            image "myapp-testing:${DOCKER_TAG}"
+                            args '--volume ${WORKSPACE}:/opt/myapp'
+                            reuseNode true
+                        }
+                    }
+                    steps {
+                        sh './bin/test-integration'
+                    }
+                    post {
+                        // Using shared library functions
+                        success { notifySuccessGithub() }
+                        failure { notifyFailureGithub() }
+                    }
+                }
+            }
+        }
+
+        // --------------------------------------------------------------------
+        // Frontend Testing stage
+        // --------------------------------------------------------------------
+        stage('Frontend') {
+            when {
+                allOf {
+                    expression { env.CACHED_PIPELINE_FRONT != "true" }
+                    anyOf {
+                        // Using shared library functions
+                        expression { hasLabel("force-frontend-tests") }
+                        expression { hasLabel("force-all-tests") }
+                        expression { hasCommitTag("frontend:") }
+                        branch "main"
+                    }
+                }
+            }
+            parallel {
+                stage ('Frontend Lint') {
+                    agent {
+                        docker {
+                            image "myapp-testing:${DOCKER_TAG}"
+                            args '--volume ${WORKSPACE}:/opt/myapp'
+                            reuseNode true
+                        }
+                    }
+                    steps {
+                        sh './frontend/bin/test-lint'
+                    }
+                    post {
+                        // Using shared library functions
+                        success { notifySuccessGithub() }
+                        failure { notifyFailureGithub() }
+                    }
+                }
+                
+                stage ('Frontend Build') {
+                    agent {
+                        docker {
+                            image "myapp-testing:${DOCKER_TAG}"
+                            args '--volume ${WORKSPACE}:/opt/myapp'
+                            reuseNode true
+                        }
+                    }
+                    steps {
+                        sh './frontend/bin/test-build'
+                    }
+                    post {
+                        // Using shared library functions
+                        success { notifySuccessGithub() }
+                        failure { notifyFailureGithub() }
+                    }
+                }
+            }
+        }
+
+        // --------------------------------------------------------------------
+        // Package build testing (optional)
+        // --------------------------------------------------------------------
+        stage ('Package') {
+            agent any
+            when {
+                anyOf {
+                    expression { hasCommitTag("pkg:") }
+                }
+            }
+            stages {
+                stage ('Package Build') {
+                    steps {
+                        sh 'make package'
+                    }
+                }
+            }
+            post {
+                // Using shared library functions
+                success { notifySuccessGithub() }
+                failure { notifyFailureGithub() }
+            }
+        }
+
+        // --------------------------------------------------------------------
+        // Functional review validation (optional)
+        // --------------------------------------------------------------------
+        stage ('Functional') {
+            steps {
+                script {
+                    if (!env.JIRA_TICKET) {
+                        echo "No ticket associated."
+                        return
+                    }
+
+                    if (!env.CHANGE_ID) {
+                        echo "Not a Pull request."
+                        return
+                    }
+
+                    def issue = jiraGetIssue(
+                        site: 'yourcompany.atlassian.net',
+                        idOrKey: env.JIRA_TICKET
+                    )
+
+                    // Functional Reviewer - 10168
+                    if (issue.data.fields.customfield_10168) {
+                        def reviewer = 
+                            issue.data.fields.customfield_10168.displayName
+                        println "Functional Reviewer: ${reviewer}"
+                    } else {
+                        println "No functional reviewer assigned."
+                    }
+
+                    // Validated - 10363
+                    def status = issue.data.fields.status
+                    println "Issue Status: ${status.name} (${status.id})"
+
+                    // For Issues with Functional reviewer
+                    if (issue.data.fields.customfield_10168) {
+                        // Not validated
+                        if (status.id != "10363") {
+                            unstable """
+                                Changes not yet validated. \
+                                Functional review required.
+                            """
+                        }
+                    }
+                }
+            }
+            post {
+                // Using shared library functions
+                success { notifySuccessGithub() }
+                failure { notifyFailureGithub() }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // Pipeline post-actions
+    // ------------------------------------------------------------------------
+    post {
+        failure {
+            // Using shared library functions
+            notifyFailureMattermost()
+        }
+        success {
+            // Using shared library functions
+            githubMarkApproved()
+            saveTestedHash(env.HASH_BACK)
+            saveTestedHash(env.HASH_FRONT)
+        }
+        unstable {
+            script { 
+                currentBuild.rawBuild.@result = hudson.model.Result.SUCCESS
+            }
+            // Using shared library functions
+            githubMarkChangesRequested()
+            saveTestedHash(env.HASH_BACK)
+            saveTestedHash(env.HASH_FRONT)
+        }
+        fixed {
+            // Using shared library functions
+            notifyFixedMattermost()
+        }
+        always {
+            cleanWs()
+        }
+    }
+}
