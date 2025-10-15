@@ -27,12 +27,11 @@ def call(
     }
 
     if (!maxHashes) {
-        maxHashes = env.MAX_HASHES?.toInteger() ?: 100
+        maxHashes = env.MAX_HASHES?.toInteger() ?: 400
     }
 
     if (!hashFile) {
-        echo "No hash file specified"
-        return
+        hashFile = "${env.JENKINS_HOME}/jobs/${env.JOB_NAME}/../cached_pipelines.txt"
     }
 
     if (isHashTested(hash, hashFile)) {
