@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-import org.pipeline.Constants
+import org.pipeline.Helpers
 
 /**
  * Notifies GitHub of an unstable/cancelled stage
@@ -34,7 +34,7 @@ def call(
         context: "${contextPrefix}-${STAGE_NAME}",
         description: description,
         status: "ERROR",
-        credentialsId: Constants.GITHUB_CREDENTIALS
+        credentialsId: Helpers.getGithubCredentials(env)
     ])
 }
 
