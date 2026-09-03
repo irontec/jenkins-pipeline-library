@@ -1,5 +1,7 @@
 #!/usr/bin/env groovy
 
+import org.pipeline.Helpers
+
 /**
  * Sends a failure notification to Mattermost
  * 
@@ -46,15 +48,20 @@ def call(
         return
     }
     
-    if (env.GIT_BRANCH == branch) {
-        mattermostSend([
-            channel: channel,
-            color: color,
-            message: """
-                ${icon} Branch ${env.GIT_BRANCH} tests failed \
-                ${icon} - (<${env.BUILD_URL}|Open>)
-            """.stripIndent().trim()
-        ])
+    String currentBranch = Helpers.getCurrentBranch(env)
+
+    if (currentBranch != Helpers.normalizeBranch(branch)) {
+        echo "Branch ${currentBranch} is not ${branch}. Skipping notification."
+        return
     }
+
+    mattermostSend([
+        channel: channel,
+        color: color,
+        message: """
+            ${icon} Branch ${currentBranch} tests failed \
+            ${icon} - (<${env.BUILD_URL}|Open>)
+        """.stripIndent().trim()
+    ])
 }
 

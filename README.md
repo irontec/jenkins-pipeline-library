@@ -321,7 +321,10 @@ Sends a failure notification to Mattermost.
 **Parameters**:
 - `channel` (String, optional): Mattermost channel
   (default: env.MATTERMOST_CHANNEL)
-- `branch` (String, optional): Branch to monitor (default: "main")
+- `branch` (String, optional): Branch to monitor (default: "main").
+  Compared against `BRANCH_NAME` (or `GIT_BRANCH` when unset), with the
+  `refs/heads/` and `origin/` prefixes stripped from both sides, so
+  `origin/main` matches `main`
 - `color` (String, optional): Message color (default: "#FF0000")
 - `icon` (String, optional): Emoji icon (default: ":red_circle:")
 

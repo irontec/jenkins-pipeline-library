@@ -6,6 +6,22 @@ documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
+## [0.0.5]
+
+### Fixed
+- `notifyFailureMattermost()` and `notifyFixedMattermost()` compared the
+  raw `GIT_BRANCH` against the target branch name. Depending on the
+  checkout refspec, the git plugin sets that variable to `origin/main` or
+  `refs/heads/main`, so the comparison silently never matched and no
+  notification was ever sent. Both now resolve the branch through
+  `Helpers.getCurrentBranch()`, which prefers the multibranch
+  `BRANCH_NAME` and strips the `refs/heads/` and `origin/` prefixes, and
+  log a line when they skip the notification instead of returning
+  silently.
+
+### Added
+- `Helpers.getCurrentBranch(env)` and `Helpers.normalizeBranch(String)`.
+
 ## [Unreleased]
 
 ### Added
