@@ -47,4 +47,12 @@ class Helpers implements Serializable {
 
         return name
     }
+
+    static String getHarborRegistry(def env) {
+        return env.HARBOR_REGISTRY ?: Constants.HARBOR_REGISTRY
+    }
+
+    static String getHarborCredentialsId(def env) {
+        return env.HARBOR_CREDENTIALS_ID ?: Constants.HARBOR_CREDENTIALS_ID
+    }
 }

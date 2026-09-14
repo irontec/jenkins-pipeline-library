@@ -25,6 +25,15 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 ## [Unreleased]
 
 ### Added
+- Harbor registry housekeeping, deleting tags rather than artifacts so
+  byte-identical images sharing a digest do not take each other down:
+  - `harborListArtifacts()`: List a repository's artifacts with their tags
+  - `harborDeleteTags()`: Delete tags, or whole untagged artifacts
+  - `harborDeleteTagsByPrefix()`: Delete every `pr-<n>-*` style tag
+  - `harborPruneTags()`: Keep the newest N `main-<commit>` tags, retention
+    counted over tags and ordered by the tag's own push time
+  - `HARBOR_REGISTRY` / `HARBOR_CREDENTIALS_ID` environment defaults
+  - `test/HarborTest.groovy`: selection logic exercised outside Jenkins
 - Initial release of the shared library
 - Git and Branch management functions:
   - `getJiraTicket()`: Extract JIRA ticket from branch name
@@ -53,6 +62,9 @@ and this project adheres to [Semantic Versioning](https://semver.org).
   - `getCurrentHash()`: Calculate directory content hash
   - `isHashTested()`: Check if hash has been tested
   - `saveTestedHash()`: Save tested hash to cache
+
+### Fixed
+- Mattermost notifications never firing on `main`
 
 ### Documentation
 - Comprehensive README.md with function documentation

@@ -14,6 +14,7 @@ notifications, and hash-based caching.
   - [JIRA Integration](#jira-integration)
   - [Mattermost Notifications](#mattermost-notifications)
   - [Hash and Caching](#hash-and-caching)
+  - [Harbor Registry](#harbor-registry)
 - [Usage Examples](#usage-examples)
 
 ## Installation
@@ -51,6 +52,8 @@ pipeline {
 - **GitHub Plugin**: For GitHub notifications
 - **JIRA Plugin**: For JIRA integration
 - **Mattermost Plugin**: For Mattermost notifications
+- **HTTP Request Plugin** and **Pipeline Utility Steps Plugin**: For the
+  Harbor functions
 
 ### Environment Variables
 
@@ -71,6 +74,11 @@ environment {
     // Hash Caching
     HASH_FILE = "${JENKINS_HOME}/caches/${JOB_NAME}/tested_hashes.txt"
     MAX_HASHES = 100  // Optional, default: 100
+
+    // Harbor Registry
+    HARBOR_PROJECT = 'my-project'
+    HARBOR_REGISTRY = 'harbor.example.com'        // Optional, default: harbor.comms.irontec.com
+    HARBOR_CREDENTIALS_ID = 'my-harbor-creds'     // Optional, default: harbor-comms-credentials
 }
 ```
 
@@ -411,6 +419,99 @@ def hash = getCurrentHash("app")
 // Run tests...
 saveTestedHash(hash)
 ```
+
+---
+
+### Harbor Registry
+
+Housekeeping of images pushed to Harbor. All of these take a single map
+argument. `project` defaults to `env.HARBOR_PROJECT`, `registry` to
+`env.HARBOR_REGISTRY` and `credentialsId` to `env.HARBOR_CREDENTIALS_ID`
+(library constants when neither is set); the credentials need delete
+rights on the project.
+
+Harbor keys artifacts by digest: two byte-identical images (two commits
+with the same tree, a preview equal to `main`, a release equal to a
+preview) are one artifact carrying several tags. These functions therefore
+delete **tags**, never artifacts, unless an artifact carries no tag at all.
+Harbor's garbage collection must have **Delete untagged artifacts** enabled
+or the digests left without tags accumulate.
+
+#### `harborListArtifacts(Map args)`
+
+Lists every artifact of a repository, with its tags, paging through the API.
+
+**Parameters**:
+- `repo` (String): Repository inside the project
+- `project`, `registry`, `credentialsId` (String, optional): See above
+
+**Returns**: `List` - Artifacts as Harbor returns them (`digest`,
+`push_time`, `tags[]`...), or `null` when the repository does not exist.
+A 401/403 fails the step.
+
+#### `harborDeleteTags(Map args)`
+
+Deletes tags, or whole untagged artifacts, from one repository. Building
+block of the two functions below.
+
+**Parameters**:
+- `repo` (String): Repository inside the project
+- `targets` (List): `[digest: String, tag: String]` entries; a `null` tag
+  deletes the artifact itself
+- `project`, `registry`, `credentialsId` (String, optional): See above
+
+**Returns**: `int` - Targets deleted. A 404 is skipped (already gone);
+anything else fails the step.
+
+#### `harborDeleteTagsByPrefix(Map args)`
+
+Deletes every tag starting with a prefix. Tearing down `pr-<n>-*` preview
+images is the typical use. Idempotent: a missing repository is skipped, a
+prefix with no tags is a no-op.
+
+**Parameters**:
+- `repos` (List): Repositories inside the project
+- `prefix` (String): Tag prefix, e.g. `"pr-12-"`
+- `project`, `registry`, `credentialsId` (String, optional): See above
+
+**Returns**: `int` - Tags deleted
+
+**Example**:
+```groovy
+harborDeleteTagsByPrefix(
+    project: 'aps',
+    repos: ['aps-app', 'aps-web'],
+    prefix: "pr-${env.PR_NUMBER}-"
+)
+```
+
+#### `harborPruneTags(Map args)`
+
+Keeps only the newest `keep` `<prefix><commit>` tags per repository, for
+jobs that push one tag per commit plus a moving tag. Only artifacts whose
+every tag is the moving tag or `<prefix>*` are candidates: anything
+carrying another tag (a preview, a release, `latest`) is never touched,
+nor is the digest the moving tag points at. Retention is counted over tags
+and ordered by the push time of the tag itself, so a commit whose image
+is byte-identical to an older one is not read as old. Untagged artifacts
+(left behind when a commit is rebuilt) are deleted whole.
+
+**Parameters**:
+- `repos` (List): Repositories inside the project
+- `keep` (int): Newest `<prefix>*` tags to keep per repository
+- `prefix` (String, optional): Per-commit tag prefix, default `"main-"`
+- `moving` (String, optional): Moving tag, default `"main"`
+- `project`, `registry`, `credentialsId` (String, optional): See above
+
+**Returns**: `int` - Tags and untagged artifacts deleted
+
+**Example**:
+```groovy
+harborPruneTags(project: 'aps', repos: ['aps-app', 'aps-web'], keep: 3)
+```
+
+The selection logic lives in `src/org/pipeline/Harbor.groovy` and runs
+outside Jenkins: `groovy -cp src:test/stubs test/HarborTest.groovy`.
 
 ---
 
