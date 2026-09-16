@@ -28,10 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 - Harbor registry housekeeping, deleting tags rather than artifacts so
   byte-identical images sharing a digest do not take each other down:
   - `harborListArtifacts()`: List a repository's artifacts with their tags
-  - `harborDeleteTags()`: Delete tags, or whole untagged artifacts
+  - `harborDeleteTags()`: Delete tags from a repository
   - `harborDeleteTagsByPrefix()`: Delete every `pr-<n>-*` style tag
   - `harborPruneTags()`: Keep the newest N `main-<commit>` tags, retention
-    counted over tags and ordered by the tag's own push time
+    counted over tags and ordered by the tag's own push time. Untagged
+    artifacts are left to Harbor's scheduled garbage collection
   - `HARBOR_REGISTRY` / `HARBOR_CREDENTIALS_ID` environment defaults
   - `test/HarborTest.groovy`: selection logic exercised outside Jenkins
 - Initial release of the shared library

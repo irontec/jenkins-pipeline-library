@@ -3,18 +3,18 @@
 import org.pipeline.Helpers
 
 /**
- * Deletes tags (or whole untagged artifacts) from a Harbor repository
+ * Deletes tags from a Harbor repository
  *
  * Building block of harborDeleteTagsByPrefix and harborPruneTags. Each
- * target is a `[digest:, tag:]` map; a null tag deletes the artifact
- * itself, which is only safe when it carries no tag at all. A 404 (already
- * gone, another run got there first) is skipped; anything else, 401/403
- * included, fails the step: a delete that did not happen must not report
- * success.
+ * target is a `[digest:, tag:]` map. Only tags are deleted, never
+ * artifacts: an artifact left with no tag is reclaimed by Harbor's
+ * scheduled garbage collection. A 404 (already gone, another run got there
+ * first) is skipped; anything else, 401/403 included, fails the step: a
+ * delete that did not happen must not report success.
  *
  * @param args.project       String Harbor project (default: env.HARBOR_PROJECT)
  * @param args.repo          String repository inside the project
- * @param args.targets       List of [digest: String, tag: String|null]
+ * @param args.targets       List of [digest: String, tag: String]
  * @param args.registry      String registry host (default: env.HARBOR_REGISTRY
  *                           or the library constant)
  * @param args.credentialsId String Jenkins credentials (default:
@@ -36,15 +36,9 @@ def call(Map args) {
 
     int deleted = 0
     for (target in (args.targets ?: [])) {
-        def url = "${base}/${target.digest}"
-        if (target.tag == null) {
-            echo "deleting untagged ${args.repo}@${target.digest}"
-        } else {
-            echo "deleting ${args.repo}:${target.tag}"
-            url += "/tags/${target.tag}"
-        }
+        echo "deleting ${args.repo}:${target.tag}"
         def resp = httpRequest(
-            url: url,
+            url: "${base}/${target.digest}/tags/${target.tag}",
             httpMode: 'DELETE',
             authentication: credentialsId,
             validResponseCodes: '200:299,404'

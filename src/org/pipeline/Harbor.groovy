@@ -11,7 +11,8 @@ import com.cloudbees.groovy.cps.NonCPS
  * Harbor keys artifacts by digest. Two byte-identical images (two commits
  * with an identical tree, a preview equal to main, a release equal to a
  * preview) are ONE artifact carrying several tags. The steps therefore
- * delete tags, never artifacts, unless an artifact carries no tag at all.
+ * delete tags, never artifacts: an artifact left with no tag is Harbor's
+ * garbage collection to reclaim, not ours.
  */
 class Harbor implements Serializable {
 
@@ -39,9 +40,7 @@ class Harbor implements Serializable {
     }
 
     /**
-     * Stale `<prefix><commit>` tags, as [digest:, tag:] entries. A tag of
-     * null means the artifact carries no tag at all and is to be deleted
-     * whole.
+     * Stale `<prefix><commit>` tags, as [digest:, tag:] entries.
      *
      * Candidates are artifacts whose every tag is `<moving>` or
      * `<prefix>*`; anything carrying another tag (a preview, a release,
@@ -54,9 +53,9 @@ class Harbor implements Serializable {
      * tag off the same artifact would otherwise read as old and be pruned
      * right after being published.
      *
-     * Untagged artifacts appear when a rebuild of the same commit re-pushes
-     * its tag onto a new digest and leaves the previous one behind. Having no
-     * tags, they are shared with nothing, so deleting them whole is safe.
+     * Untagged artifacts (a rebuild of the same commit re-pushes its tag onto
+     * a new digest and leaves the previous one behind) are skipped: Harbor's
+     * scheduled garbage collection reclaims them.
      */
     @NonCPS
     static List staleTags(artifacts, String prefix, String moving, int keep) {
@@ -70,7 +69,6 @@ class Harbor implements Serializable {
             String digest = artifact.digest.toString()
             def tags = artifact.tags
             if (!(tags instanceof List) || tags.isEmpty()) {
-                stale.add([digest: digest, tag: null])
                 continue
             }
             boolean onlyOurs = true

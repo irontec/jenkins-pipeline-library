@@ -47,9 +47,9 @@ def a2 = [
 ]
 check('tag push_time wins over artifact', Harbor.staleTags(a2, 'main-', 'main', 3), ['dShared:main-a', 'd2:main-b'])
 
-// 3. untagged artifact is deleted whole
-def a3 = [art('dOrphan', [], 't1'), art('d2', [['main-b', 't2']], 't2')]
-check('untagged deleted whole', Harbor.staleTags(a3, 'main-', 'main', 0), ['dOrphan:null', 'd2:main-b'])
+// 3. untagged artifact is left to Harbor's garbage collection
+def a3 = [art('dOrphan', [], 't1'), art('dNoTags', null, 't1'), art('d2', [['main-b', 't2']], 't2')]
+check('untagged left to GC', Harbor.staleTags(a3, 'main-', 'main', 0), ['d2:main-b'])
 
 // 4. a digest shared with a preview or a release is untouched
 def a4 = [

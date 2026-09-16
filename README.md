@@ -433,9 +433,9 @@ rights on the project.
 Harbor keys artifacts by digest: two byte-identical images (two commits
 with the same tree, a preview equal to `main`, a release equal to a
 preview) are one artifact carrying several tags. These functions therefore
-delete **tags**, never artifacts, unless an artifact carries no tag at all.
-Harbor's garbage collection must have **Delete untagged artifacts** enabled
-or the digests left without tags accumulate.
+delete **tags**, never artifacts. Harbor's garbage collection must have
+**Delete untagged artifacts** enabled or the digests left without tags
+accumulate.
 
 #### `harborListArtifacts(Map args)`
 
@@ -451,13 +451,12 @@ A 401/403 fails the step.
 
 #### `harborDeleteTags(Map args)`
 
-Deletes tags, or whole untagged artifacts, from one repository. Building
-block of the two functions below.
+Deletes tags from one repository. Building block of the two functions
+below.
 
 **Parameters**:
 - `repo` (String): Repository inside the project
-- `targets` (List): `[digest: String, tag: String]` entries; a `null` tag
-  deletes the artifact itself
+- `targets` (List): `[digest: String, tag: String]` entries
 - `project`, `registry`, `credentialsId` (String, optional): See above
 
 **Returns**: `int` - Targets deleted. A 404 is skipped (already gone);
@@ -494,7 +493,8 @@ carrying another tag (a preview, a release, `latest`) is never touched,
 nor is the digest the moving tag points at. Retention is counted over tags
 and ordered by the push time of the tag itself, so a commit whose image
 is byte-identical to an older one is not read as old. Untagged artifacts
-(left behind when a commit is rebuilt) are deleted whole.
+(left behind when a commit is rebuilt) are left to Harbor's garbage
+collection.
 
 **Parameters**:
 - `repos` (List): Repositories inside the project
@@ -503,7 +503,7 @@ is byte-identical to an older one is not read as old. Untagged artifacts
 - `moving` (String, optional): Moving tag, default `"main"`
 - `project`, `registry`, `credentialsId` (String, optional): See above
 
-**Returns**: `int` - Tags and untagged artifacts deleted
+**Returns**: `int` - Tags deleted
 
 **Example**:
 ```groovy

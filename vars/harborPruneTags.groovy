@@ -12,7 +12,7 @@ import org.pipeline.Harbor
  * digest the moving tag points at. Deletes tags, not artifacts, so two
  * commits sharing a byte-identical image do not take each other down;
  * retention is counted over tags and ordered by the push time of the tag
- * itself. An artifact carrying no tag at all is deleted whole.
+ * itself.
  *
  * Requires "Delete untagged artifacts" in Harbor's garbage collection, or
  * the digests left without tags accumulate.
@@ -26,7 +26,7 @@ import org.pipeline.Harbor
  *                           or the library constant)
  * @param args.credentialsId String Jenkins credentials (default:
  *                           env.HARBOR_CREDENTIALS_ID or the library constant)
- * @return int number of tags and untagged artifacts deleted
+ * @return int number of tags deleted
  *
  * @example
  * harborPruneTags(project: 'aps', repos: ['aps-app', 'aps-web'], keep: 3)
@@ -49,6 +49,6 @@ def call(Map args) {
         }
         deleted += harborDeleteTags(args + [repo: repo, targets: Harbor.staleTags(artifacts, prefix, moving, keep)])
     }
-    echo "Deleted ${deleted} stale ${prefix}* tag(s)/untagged artifact(s)"
+    echo "Deleted ${deleted} stale ${prefix}* tag(s)"
     return deleted
 }
