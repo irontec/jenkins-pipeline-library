@@ -487,10 +487,10 @@ harborDeleteTagsByPrefix(
 #### `harborPruneTags(Map args)`
 
 Keeps only the newest `keep` `<prefix><commit>` tags per repository, for
-jobs that push one tag per commit plus a moving tag. Only artifacts whose
-every tag is the moving tag or `<prefix>*` are candidates: anything
-carrying another tag (a preview, a release, `latest`) is never touched,
-nor is the digest the moving tag points at. Retention is counted over tags
+jobs that push one tag per commit plus a moving tag. Every `<prefix>*` tag
+counts, including one sharing its digest with a preview, a release or
+`latest`: those other tags are never touched, nor are the `<prefix>*` tags
+on the digest the moving tag points at. Retention is counted over tags
 and ordered by the push time of the tag itself, so a commit whose image
 is byte-identical to an older one is not read as old. Untagged artifacts
 (left behind when a commit is rebuilt) are left to Harbor's garbage

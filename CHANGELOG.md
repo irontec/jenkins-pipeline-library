@@ -6,6 +6,17 @@ documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
+## [0.0.7]
+
+### Fixed
+- `harborPruneTags()` skipped every artifact carrying a tag other than the
+  moving one or `<prefix>*`. A build byte-identical to a release or a
+  preview shares their digest, so its `<prefix>*` tag was neither pruned
+  nor counted towards `keep`, and the history grew past `keep` with every
+  release. Every `<prefix>*` tag is now a candidate; the step still
+  deletes only `<prefix>*` tags, so the release, `latest` and preview tags
+  on a shared digest stay, and so does the artifact.
+
 ## [0.0.5]
 
 ### Fixed

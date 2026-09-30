@@ -6,10 +6,10 @@ import org.pipeline.Harbor
  * Keeps only the newest N `<prefix><commit>` tags of Harbor repositories
  *
  * Housekeeping for jobs that push one tag per commit plus a moving tag
- * (`main-<commit>` and `main`). Only artifacts whose every tag is the
- * moving tag or `<prefix>*` are candidates; anything carrying another tag
- * (a preview, a release, `latest`) is never touched, and neither is the
- * digest the moving tag points at. Deletes tags, not artifacts, so two
+ * (`main-<commit>` and `main`). Every `<prefix>*` tag counts, including
+ * one sharing its digest with a preview, a release or `latest`; those
+ * other tags are never touched, and neither are the `<prefix>*` tags on
+ * the digest the moving tag points at. Deletes tags, not artifacts, so two
  * commits sharing a byte-identical image do not take each other down;
  * retention is counted over tags and ordered by the push time of the tag
  * itself.

@@ -42,10 +42,14 @@ class Harbor implements Serializable {
     /**
      * Stale `<prefix><commit>` tags, as [digest:, tag:] entries.
      *
-     * Candidates are artifacts whose every tag is `<moving>` or
-     * `<prefix>*`; anything carrying another tag (a preview, a release,
-     * `latest`) is left alone. Of the candidate tags the newest `keep`
-     * survive, and so does every tag on the digest `<moving>` points at.
+     * Every `<prefix>*` tag in the repository is a candidate, whatever else
+     * its artifact carries: a build byte-identical to a preview or a
+     * release shares their digest, and skipping those artifacts would leave
+     * its tag out of the count and keep it for as long as the release
+     * lives. Other tags (a preview, a release, `latest`) are never
+     * returned, so they and their artifact stay. Of the candidates the
+     * newest `keep` survive, and so does every one on the digest `<moving>`
+     * points at.
      *
      * Retention counts tags and orders them by the push time of the tag
      * itself, not of the artifact: the artifact keeps the push time of the
@@ -71,18 +75,6 @@ class Harbor implements Serializable {
             if (!(tags instanceof List) || tags.isEmpty()) {
                 continue
             }
-            boolean onlyOurs = true
-            for (int t = 0; t < tags.size(); t++) {
-                def name = tags.get(t).name
-                String tag = name == null ? '' : name.toString()
-                if (tag != moving && !tag.startsWith(prefix)) {
-                    onlyOurs = false
-                    break
-                }
-            }
-            if (!onlyOurs) {
-                continue
-            }
             // The artifact's push time is the fallback ordering key: Harbor
             // does fill in the tag's own, but an absent one must not read as
             // the oldest tag in the repository and be pruned on the spot.
@@ -92,6 +84,9 @@ class Harbor implements Serializable {
                 String tag = entry.name == null ? '' : entry.name.toString()
                 if (tag == moving) {
                     movingDigest = digest
+                    continue
+                }
+                if (!tag.startsWith(prefix)) {
                     continue
                 }
                 String time = entry.push_time == null ? fallback : entry.push_time.toString()

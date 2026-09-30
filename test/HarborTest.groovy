@@ -51,12 +51,26 @@ check('tag push_time wins over artifact', Harbor.staleTags(a2, 'main-', 'main', 
 def a3 = [art('dOrphan', [], 't1'), art('dNoTags', null, 't1'), art('d2', [['main-b', 't2']], 't2')]
 check('untagged left to GC', Harbor.staleTags(a3, 'main-', 'main', 0), ['d2:main-b'])
 
-// 4. a digest shared with a preview or a release is untouched
+// 4. on a digest shared with a preview or a release, the `main-*` tag is
+//    pruned like any other and the foreign tags are never returned
 def a4 = [
     art('dShared', [['main-a', 't1'], ['pr-7-abc', 't1']], 't1'),
     art('dRel', [['main-b', 't2'], ['v1.2.3', 't2'], ['latest', 't2']], 't2'),
 ]
-check('digest shared with pr-/release skipped', Harbor.staleTags(a4, 'main-', 'main', 0), [])
+check('only the prefixed tag of a shared digest', Harbor.staleTags(a4, 'main-', 'main', 0),
+    ['dShared:main-a', 'dRel:main-b'])
+
+// 4b. tags on shared digests count towards `keep`: a release and a preview
+//     byte-identical to main builds must not stretch the history past it
+def a4b = [
+    art('dNew', [['pr-9-abc', 't7'], ['main', 't8'], ['main-f', 't8']], 't7'),
+    art('d5', [['main-e', 't6']], 't6'),
+    art('dRel', [['main-c', 't3'], ['v1.2.3', 't4'], ['latest', 't4'], ['main-d', 't5']], 't3'),
+    art('d2', [['main-b', 't2']], 't2'),
+    art('dOldRel', [['main-a', 't1'], ['v1.2.2', 't1']], 't1'),
+]
+check('shared digests count towards keep', Harbor.staleTags(a4b, 'main-', 'main', 3),
+    ['dRel:main-c', 'd2:main-b', 'dOldRel:main-a'])
 
 // 5. moving `main` parked on an old digest keeps that build
 def a5 = [
