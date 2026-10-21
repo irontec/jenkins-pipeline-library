@@ -15,6 +15,7 @@ notifications, and hash-based caching.
   - [Mattermost Notifications](#mattermost-notifications)
   - [Hash and Caching](#hash-and-caching)
   - [Harbor Registry](#harbor-registry)
+  - [GitOps](#gitops)
 - [Usage Examples](#usage-examples)
 
 ## Installation
@@ -54,7 +55,8 @@ pipeline {
 - **Mattermost Plugin**: For Mattermost notifications
 - **HTTP Request Plugin** and **Pipeline Utility Steps Plugin**: For the
   Harbor functions
-- **Active Choices Plugin**: For `harborVersionParam()`
+- **Active Choices Plugin**: For `harborVersionParam()` and
+  `gitopsTenantParam()`
 
 ### Environment Variables
 
@@ -548,6 +550,54 @@ first run of the job.
 
 The selection logic lives in `src/org/pipeline/Harbor.groovy` and runs
 outside Jenkins: `groovy -cp src:test/stubs test/HarborTest.groovy`.
+
+
+### GitOps
+
+#### `gitopsTenantParam(Map args)`
+
+Build parameter offering the tenants of a GitOps repository, chosen by
+another parameter. An Active Choices single-select reactive on
+`environmentParam`: when the environment changes in the build form, it
+reads that environment's repository tree from GitHub (one API call, at
+`ref`) and lists the directories under `dir` holding every one of
+`requiredFiles`. Adding a tenant directory to the repository adds it to
+the form, with no change to the job. Errors show up as an `Error: ...`
+choice.
+
+Like `harborVersionParam()`, the step generates the whole script and
+pastes it into the parameter; it runs in the Groovy sandbox.
+
+**Parameters**:
+- `name` (String): Parameter name
+- `environmentParam` (String): Parameter it reacts to; its values are the
+  keys of `repos`
+- `repos` (Map): Environment -> GitHub `owner/name`
+- `dir` (String): Directory with one directory per tenant
+- `requiredFiles` (List, optional): Files a tenant directory must hold,
+  default none
+- `exclude` (List, optional): Tenants never offered, such as one deployed
+  by other means
+- `ref` (String, optional): Branch read, default `"main"`
+- `description` (String, optional): Parameter description
+- `credentialsId` (String, optional): Username/token credentials with read
+  access, default the library's GitHub credentials
+
+**Returns**: `Map` - Parameter definition for `properties([parameters([...])])`
+
+**Example**:
+```groovy
+def repos = [eu: 'acme/gitops-eu', us: 'acme/gitops-us']
+properties([parameters([
+    choice(name: 'ENVIRONMENT', choices: ['eu', 'us']),
+    gitopsTenantParam(name: 'TENANT', environmentParam: 'ENVIRONMENT', repos: repos,
+                      dir: 'deploy/values', requiredFiles: ['values.yaml'],
+                      exclude: ['sandbox']),
+])])
+```
+
+The selection logic lives in `src/org/pipeline/Gitops.groovy`:
+`groovy -cp src:test/stubs test/GitopsTest.groovy`.
 
 ---
 
