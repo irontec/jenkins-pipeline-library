@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 ## [Unreleased]
 
 ### Added
+- `harborVersionParam()`: Active Choices build parameter listing a
+  Harbor repository's version tags, newest first, compared numerically
 - Harbor registry housekeeping, deleting tags rather than artifacts so
   byte-identical images sharing a digest do not take each other down:
   - `harborListArtifacts()`: List a repository's artifacts with their tags

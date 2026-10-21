@@ -54,6 +54,7 @@ pipeline {
 - **Mattermost Plugin**: For Mattermost notifications
 - **HTTP Request Plugin** and **Pipeline Utility Steps Plugin**: For the
   Harbor functions
+- **Active Choices Plugin**: For `harborVersionParam()`
 
 ### Environment Variables
 
@@ -509,6 +510,41 @@ collection.
 ```groovy
 harborPruneTags(project: 'aps', repos: ['aps-app', 'aps-web'], keep: 3)
 ```
+
+#### `harborVersionParam(Map args)`
+
+Build parameter offering the version tags of a repository, newest first,
+for the build form of jobs that deploy a chosen version. An Active Choices
+single-select: the list is read when the form opens. Versions compare
+numerically (`0.10.0` above `0.9.0`); only the newest 100 artifacts are
+read. Errors (credentials missing, Harbor down) show up as an
+`Error: ...` choice. Read access to the project is enough.
+
+Active Choices runs that script on its own, without this library, so the
+step generates the whole script and pastes it into the parameter. It runs
+in the Groovy sandbox and needs, once, the In-process Script Approval
+signatures it uses (credentials lookup, `plainText`, `URL.openConnection`).
+
+**Parameters**:
+- `name` (String): Parameter name
+- `repo` (String): Repository inside the project
+- `semverOnly` (boolean, optional): Only `X.Y.Z` tags, default `true`
+- `description` (String, optional): Parameter description
+- `project`, `registry`, `credentialsId` (String, optional): See above
+
+**Returns**: `Map` - Parameter definition for `properties([parameters([...])])`
+
+**Example**:
+```groovy
+properties([parameters([
+    harborVersionParam(name: 'CHART_VERSION', project: 'shop', repo: 'shop-chart',
+                       semverOnly: false),
+    harborVersionParam(name: 'API_VERSION', project: 'shop', repo: 'api'),
+])])
+```
+
+Parameters declared from a Jenkinsfile reach the build form after the
+first run of the job.
 
 The selection logic lives in `src/org/pipeline/Harbor.groovy` and runs
 outside Jenkins: `groovy -cp src:test/stubs test/HarborTest.groovy`.

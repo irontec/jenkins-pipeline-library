@@ -109,5 +109,54 @@ check('prefixed tags only', Harbor.prefixedTags(a9, 'pr-7-'), ['dShared:pr-7-aaa
 // 10. no match, nothing
 check('prefix without matches', Harbor.prefixedTags(a9, 'pr-9-'), [])
 
+// --- VERSION_PICKER --------------------------------------------------------
+
+def pick = { artifacts, boolean semverOnly ->
+    new GroovyShell(new Binding(artifacts: artifacts))
+        .evaluate(Harbor.VERSION_PICKER + "\nreturn pickVersions(artifacts, ${semverOnly})")
+}
+def checkList = { String name, actual, List expected ->
+    if (actual != expected) {
+        println "FAIL ${name}\n  got  ${actual}\n  want ${expected}"
+        fails++
+    } else {
+        println "ok   ${name}"
+    }
+}
+
+// 11. numeric order, not string order: 0.10.0 above 0.9.0
+def a11 = [
+    art('d1', [['0.9.0', 't1'], ['main-a', 't1']], 't1'),
+    art('d2', [['0.10.0', 't2'], ['latest', 't2']], 't2'),
+    art('d3', [['0.10.1', 't3'], ['0.10.1-rc1', 't3']], 't3'),
+    art('d4', [['1.0', 't4']], 't4'),
+]
+checkList('semver only, newest first', pick(a11, true), ['0.10.1', '0.10.0', '0.9.0'])
+
+// 12. without the filter every tag comes back, versions still ordered
+checkList('every tag', pick(a11, false),
+    ['main-a', 'latest', '1.0', '0.10.1-rc1', '0.10.1', '0.10.0', '0.9.0'])
+
+// 13. one tag on two digests once; untagged artifacts ignored
+def a13 = [art('d1', [['1.2.3', 't1']], 't1'), art('d2', [['1.2.3', 't2']], 't2'),
+           art('dOrphan', [], 't3'), art('dNoTags', null, 't4')]
+checkList('duplicates and untagged', pick(a13, true), ['1.2.3'])
+
+// --- versionChoicesScript --------------------------------------------------
+
+// 14. the generated script compiles, and fails soft without credentials
+def generated = Harbor.versionChoicesScript('harbor.example.com', 'shop', 'api', 'harbor-creds', true)
+checkList('script without credentials', new GroovyShell().evaluate(generated),
+    ["Error: credentials 'harbor-creds' not found in Jenkins"])
+
+// 15. a value that would break out of the string literal is refused
+try {
+    Harbor.versionChoicesScript('harbor.example.com', "shop'; evil()", 'api', 'harbor-creds', true)
+    println 'FAIL unsafe value refused'
+    fails++
+} catch (IllegalArgumentException e) {
+    println 'ok   unsafe value refused'
+}
+
 println fails == 0 ? 'ALL OK' : "${fails} FAILING"
 System.exit(fails == 0 ? 0 : 1)

@@ -111,4 +111,100 @@ class Harbor implements Serializable {
         }
         return stale
     }
+
+    /**
+     * Groovy source defining pickVersions(artifacts, semverOnly): the tag
+     * names of a Harbor artifact listing, newest version first. With
+     * semverOnly, only plain `X.Y.Z` tags. Versions compare numerically
+     * field by field (0.10.0 above 0.9.0), not as strings.
+     *
+     * It is source, not a method, because Active Choices runs a parameter
+     * script on its own, outside any pipeline and without this library on
+     * the classpath: versionChoicesScript() embeds it in the script it
+     * generates, and test/HarborTest.groovy evaluates it on its own. It
+     * only uses calls the script-security generic whitelist allows.
+     */
+    static final String VERSION_PICKER = '''
+def pickVersions(artifacts, boolean semverOnly) {
+    def versions = []
+    artifacts.each { artifact ->
+        artifact.tags?.each { tag ->
+            String name = tag.name == null ? '' : tag.name.toString()
+            if (name && (!semverOnly || name ==~ /^\\d+\\.\\d+\\.\\d+$/)) {
+                versions << name
+            }
+        }
+    }
+    return versions.unique().sort { a, b -> compareVersions(b, a) }
+}
+
+def compareVersions(String a, String b) {
+    def x = a.tokenize('.')
+    def y = b.tokenize('.')
+    int n = x.size() < y.size() ? x.size() : y.size()
+    for (int i = 0; i < n; i++) {
+        int c = (x[i].isInteger() && y[i].isInteger()) ?
+            x[i].toInteger() <=> y[i].toInteger() : x[i] <=> y[i]
+        if (c != 0) {
+            return c
+        }
+    }
+    return x.size() <=> y.size()
+}
+'''
+
+    /**
+     * Active Choices script listing the version tags of a Harbor repository,
+     * newest first; harborVersionParam() wraps it in a build parameter.
+     *
+     * Reads the newest 100 artifacts. Any failure comes back as a single
+     * "Error: ..." choice, so a broken registry shows in the build form
+     * instead of an empty list.
+     */
+    @NonCPS
+    static String versionChoicesScript(String registry, String project, String repo,
+                                       String credentialsId, boolean semverOnly) {
+        // The values are pasted into the script source: refuse anything that
+        // could close the string literal.
+        [registry, project, repo, credentialsId].each { value ->
+            if (!(value ==~ /[A-Za-z0-9._\/-]+/)) {
+                throw new IllegalArgumentException("unsafe Harbor parameter value: '${value}'")
+            }
+        }
+        String url = "https://${registry}/api/v2.0/projects/${project}/repositories/" +
+            "${repo.replace('/', '%252F')}/artifacts?page_size=100&with_tag=true&sort=-push_time"
+        return '''import groovy.json.JsonSlurper
+import com.cloudbees.plugins.credentials.CredentialsProvider
+import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials
+import jenkins.model.Jenkins
+''' + VERSION_PICKER + """
+def credsId = '${credentialsId}'
+def apiUrl = '${url}'
+""" + '''
+try {
+    def credentials = CredentialsProvider.lookupCredentials(
+        StandardUsernamePasswordCredentials.class, Jenkins.get(), null, null
+    ).find { it.id == credsId }
+    if (!credentials) {
+        return ["Error: credentials '${credsId}' not found in Jenkins"]
+    }
+    def auth = "${credentials.username}:${credentials.password.plainText}".bytes.encodeBase64().toString()
+
+    def connection = new URL(apiUrl).openConnection() as HttpURLConnection
+    connection.setRequestMethod('GET')
+    connection.setRequestProperty('Authorization', "Basic ${auth}")
+    connection.setRequestProperty('Accept', 'application/json')
+    connection.setConnectTimeout(5000)
+    connection.setReadTimeout(5000)
+    if (connection.responseCode != 200) {
+        return ["Error: Harbor HTTP ${connection.responseCode}: ${connection.responseMessage}"]
+    }
+
+    def versions = pickVersions(new JsonSlurper().parseText(connection.inputStream.text), ''' + semverOnly + ''')
+    return versions ?: ["Error: no ''' + (semverOnly ? 'X.Y.Z ' : '') + '''tags in ''' + "${project}/${repo}" + '''"]
+} catch (Exception e) {
+    return ["Error: ${e.message}"]
+}
+'''
+    }
 }
