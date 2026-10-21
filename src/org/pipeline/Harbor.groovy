@@ -118,6 +118,10 @@ class Harbor implements Serializable {
      * semverOnly, only plain `X.Y.Z` tags. Versions compare numerically
      * field by field (0.10.0 above 0.9.0), not as strings.
      *
+     * Also markCurrent(versions, current): the versions as a value -> label
+     * map with `current` labelled "(actual)" and preselected, inserted in
+     * order when the listing lacks it; the plain list when there is none.
+     *
      * It is source, not a method, because Active Choices runs a parameter
      * script on its own, outside any pipeline and without this library on
      * the classpath: versionChoicesScript() embeds it in the script it
@@ -151,6 +155,26 @@ def compareVersions(String a, String b) {
     }
     return x.size() <=> y.size()
 }
+
+def markCurrent(List versions, String current) {
+    if (!current) {
+        return versions
+    }
+    def all = versions.collect { it }
+    if (!all.contains(current)) {
+        int pos = 0
+        while (pos < all.size() && compareVersions(all[pos], current) > 0) {
+            pos++
+        }
+        all.add(pos, current)
+    }
+    // value -> label; Active Choices preselects a label ending in :selected.
+    def choices = [:]
+    all.each { version ->
+        choices[version] = version == current ? "${version} (actual):selected".toString() : version
+    }
+    return choices
+}
 '''
 
     /**
@@ -160,10 +184,15 @@ def compareVersions(String a, String b) {
      * Reads the newest 100 artifacts. Any failure comes back as a single
      * "Error: ..." choice, so a broken registry shows in the build form
      * instead of an empty list.
+     *
+     * With currentSource (Gitops.currentValueSource()), the version it
+     * reads is marked as the current one and preselected; when it cannot
+     * be read the list comes unmarked.
      */
     @NonCPS
     static String versionChoicesScript(String registry, String project, String repo,
-                                       String credentialsId, boolean semverOnly) {
+                                       String credentialsId, boolean semverOnly,
+                                       String currentSource = null) {
         // The values are pasted into the script source: refuse anything that
         // could close the string literal.
         [registry, project, repo, credentialsId].each { value ->
@@ -177,7 +206,11 @@ def compareVersions(String a, String b) {
 import com.cloudbees.plugins.credentials.CredentialsProvider
 import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials
 import jenkins.model.Jenkins
-''' + VERSION_PICKER + """
+''' + VERSION_PICKER + (currentSource ? Gitops.YAML_VALUE + currentSource : '''
+def currentValue() {
+    return null
+}
+''') + """
 def credsId = '${credentialsId}'
 def apiUrl = '${url}'
 """ + '''
@@ -201,7 +234,10 @@ try {
     }
 
     def versions = pickVersions(new JsonSlurper().parseText(connection.inputStream.text), ''' + semverOnly + ''')
-    return versions ?: ["Error: no ''' + (semverOnly ? 'X.Y.Z ' : '') + '''tags in ''' + "${project}/${repo}" + '''"]
+    if (!versions) {
+        return ["Error: no ''' + (semverOnly ? 'X.Y.Z ' : '') + '''tags in ''' + "${project}/${repo}" + '''"]
+    }
+    return markCurrent(versions, currentValue())
 } catch (Exception e) {
     return ["Error: ${e.message}"]
 }

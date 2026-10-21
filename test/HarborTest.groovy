@@ -142,11 +142,39 @@ def a13 = [art('d1', [['1.2.3', 't1']], 't1'), art('d2', [['1.2.3', 't2']], 't2'
            art('dOrphan', [], 't3'), art('dNoTags', null, 't4')]
 checkList('duplicates and untagged', pick(a13, true), ['1.2.3'])
 
+// --- markCurrent -----------------------------------------------------------
+
+def mark = { List versions, String current ->
+    new GroovyShell(new Binding(versions: versions, current: current))
+        .evaluate(Harbor.VERSION_PICKER + '\nreturn markCurrent(versions, current)')
+}
+def keysAndLabels = { Map m -> m.collect { k, v -> "${k}=${v}".toString() } }
+
+// 15b. the current version is labelled and preselected, order kept
+checkList('current in the list', keysAndLabels(mark(['0.10.0', '0.9.1', '0.9.0'], '0.9.1')),
+    ['0.10.0=0.10.0', '0.9.1=0.9.1 (actual):selected', '0.9.0=0.9.0'])
+
+// 15c. a current version missing from the listing is inserted in order
+checkList('current not listed', keysAndLabels(mark(['0.10.0', '0.9.0'], '0.9.5')),
+    ['0.10.0=0.10.0', '0.9.5=0.9.5 (actual):selected', '0.9.0=0.9.0'])
+
+// 15d. no current version: the plain list
+checkList('no current', mark(['0.10.0', '0.9.0'], null), ['0.10.0', '0.9.0'])
+
 // --- versionChoicesScript --------------------------------------------------
 
 // 14. the generated script compiles, and fails soft without credentials
 def generated = Harbor.versionChoicesScript('harbor.example.com', 'shop', 'api', 'harbor-creds', true)
 checkList('script without credentials', new GroovyShell().evaluate(generated),
+    ["Error: credentials 'harbor-creds' not found in Jenkins"])
+
+// 14b. with a current source too
+def withCurrent = Harbor.versionChoicesScript('harbor.example.com', 'shop', 'api', 'harbor-creds', true,
+    org.pipeline.Gitops.currentValueSource([environmentParam: 'ENVIRONMENT', tenantParam: 'TENANT',
+        repos: [eu: 'acme/gitops-eu'], dir: 'deploy/values', file: 'versions.yaml',
+        path: '.api.image.tag', ref: 'main', credentialsId: 'github-creds']))
+checkList('script with current, without credentials',
+    new GroovyShell(new Binding(ENVIRONMENT: 'eu', TENANT: 'alpha')).evaluate(withCurrent),
     ["Error: credentials 'harbor-creds' not found in Jenkins"])
 
 // 15. a value that would break out of the string literal is refused

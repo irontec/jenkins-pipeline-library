@@ -40,7 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org).
   environment parameter, listing the tenants found in that environment's
   GitOps repository on GitHub
 - `harborVersionParam()`: Active Choices build parameter listing a
-  Harbor repository's version tags, newest first, compared numerically
+  Harbor repository's version tags, newest first, compared numerically.
+  With `current`, it labels and preselects the version the selected
+  tenant has in its GitOps repository
 - Harbor registry housekeeping, deleting tags rather than artifacts so
   byte-identical images sharing a digest do not take each other down:
   - `harborListArtifacts()`: List a repository's artifacts with their tags

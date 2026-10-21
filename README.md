@@ -533,6 +533,8 @@ signatures it uses (credentials lookup, `plainText`, `URL.openConnection`).
 - `semverOnly` (boolean, optional): Only `X.Y.Z` tags, default `true`
 - `description` (String, optional): Parameter description
 - `project`, `registry`, `credentialsId` (String, optional): See above
+- `current` (Map, optional): Where the version the selected tenant runs
+  lives, to label it "(actual)" and preselect it (see below)
 
 **Returns**: `Map` - Parameter definition for `properties([parameters([...])])`
 
@@ -542,6 +544,32 @@ properties([parameters([
     harborVersionParam(name: 'CHART_VERSION', project: 'shop', repo: 'shop-chart',
                        semverOnly: false),
     harborVersionParam(name: 'API_VERSION', project: 'shop', repo: 'api'),
+])])
+```
+
+**Current version**: with `current`, the parameter reacts to an
+environment and a tenant parameter, as `gitopsTenantParam()` declares
+them. It reads one YAML file of the selected tenant from GitHub and the
+scalar at a `.a.b.c` path in it; that version is labelled "(actual)" and
+preselected, and inserted in order if Harbor did not list it. When the
+file cannot be read the list comes unmarked. Keys of `current`:
+`environmentParam`, `tenantParam` (parameter names), `repos` (environment
+-> GitHub `owner/name`), `dir` (directory of tenant directories), `file`
+(inside the tenant directory), `path`, and optionally `ref` (default
+`"main"`) and `credentialsId` (default the library's GitHub credentials).
+The YAML reader only understands block mappings, which is what values
+files holding versions look like.
+
+```groovy
+def repos = [eu: 'acme/gitops-eu', us: 'acme/gitops-us']
+def current = [environmentParam: 'ENVIRONMENT', tenantParam: 'TENANT', repos: repos,
+               dir: 'deploy/values']
+properties([parameters([
+    choice(name: 'ENVIRONMENT', choices: ['eu', 'us']),
+    gitopsTenantParam(name: 'TENANT', environmentParam: 'ENVIRONMENT', repos: repos,
+                      dir: 'deploy/values'),
+    harborVersionParam(name: 'API_VERSION', project: 'shop', repo: 'api',
+                       current: current + [file: 'versions.yaml', path: '.api.image.tag']),
 ])])
 ```
 

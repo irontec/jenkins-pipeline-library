@@ -89,5 +89,74 @@ check('environment not set', new GroovyShell().evaluate(generated), ['Error: ENV
     }
 }
 
+// --- YAML_VALUE ------------------------------------------------------------
+
+def yaml = { String text, String path ->
+    new GroovyShell(new Binding(text: text, path: path))
+        .evaluate(Gitops.YAML_VALUE + '\nreturn yamlValue(text, path)')
+}
+def doc = '''# versions of the tenant
+chartVersion: 1.4.0
+api:
+  image:
+    repository: registry.example.com/shop/api
+    tag: "2.10.1"   # bumped by CI
+  replicas: 2
+web:
+  image:
+    tag: '0.9.3'
+worker:
+  image: {}
+other:
+  api:
+    image:
+      tag: 9.9.9
+'''
+
+// 8. scalars at nested paths, unquoted, trailing comment dropped
+check('top-level scalar', yaml(doc, '.chartVersion'), '1.4.0')
+check('double-quoted nested scalar', yaml(doc, '.api.image.tag'), '2.10.1')
+check('single-quoted nested scalar', yaml(doc, '.web.image.tag'), '0.9.3')
+
+// 9. a key with the same name at another depth is not a match
+check('same key elsewhere', yaml(doc, '.other.api.image.tag'), '9.9.9')
+
+// 10. missing path, mapping instead of scalar, empty document
+check('missing path', yaml(doc, '.worker.image.tag'), null)
+check('mapping, not scalar', yaml(doc, '.api.image'), null)
+check('empty document', yaml('', '.api.image.tag'), null)
+
+// --- currentValueSource ----------------------------------------------------
+
+def current = [environmentParam: 'ENVIRONMENT', tenantParam: 'TENANT', repos: repos,
+               dir: 'deploy/values', file: 'versions.yaml', path: '.api.image.tag',
+               ref: 'main', credentialsId: 'github-creds']
+def currentScript = '''import com.cloudbees.plugins.credentials.CredentialsProvider
+import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials
+import jenkins.model.Jenkins
+''' + Gitops.YAML_VALUE + Gitops.currentValueSource(current) + '\nreturn currentValue()'
+
+// 11. compiles, and is null without credentials, parameters or a valid tenant
+check('current without credentials',
+    new GroovyShell(new Binding(ENVIRONMENT: 'us', TENANT: 'alpha')).evaluate(currentScript), null)
+check('current with parameters unbound', new GroovyShell().evaluate(currentScript), null)
+check('current with an unsafe tenant',
+    new GroovyShell(new Binding(ENVIRONMENT: 'us', TENANT: '../x')).evaluate(currentScript), null)
+
+// 12. values that would break out of the script are refused
+[
+    [tenantParam: 'TENANT; evil()'],
+    [path: ".api'; evil()"],
+    [repos: [eu: "x/y'; evil()"]],
+].each { override ->
+    try {
+        Gitops.currentValueSource(current + override)
+        println "FAIL unsafe current refused: ${override}"
+        fails++
+    } catch (IllegalArgumentException e) {
+        println "ok   unsafe current refused: ${e.message}"
+    }
+}
+
 println fails == 0 ? 'ALL OK' : "${fails} FAILING"
 System.exit(fails == 0 ? 0 : 1)
