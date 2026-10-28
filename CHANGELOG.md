@@ -84,6 +84,11 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 
 ### Fixed
 - Mattermost notifications never firing on `main`
+- `saveTestedHash()` read, modified and rewrote the cache file without
+  any locking, so two stages or builds saving at the same time could each
+  write back their own copy and drop the other's hash. The update now
+  runs inside `lock()` on the normalized file path, which needs the
+  Lockable Resources plugin
 
 ### Documentation
 - Comprehensive README.md with function documentation

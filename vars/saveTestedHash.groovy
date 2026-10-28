@@ -6,6 +6,11 @@
  * Maintains a rolling cache of tested hashes
  * Removes oldest entries when maximum is reached
  *
+ * The read-modify-write of the cache file runs inside a lock named after
+ * the normalized file path, so parallel stages, or builds of other jobs
+ * sharing the same file, do not overwrite each other's hashes. Requires
+ * the Lockable Resources plugin.
+ *
  * @param hash String hash to save
  * @param hashFile String path to cache file (uses env.HASH_FILE if not
  *                 provided)
@@ -34,24 +39,31 @@ def call(
         hashFile = "${env.JENKINS_HOME}/jobs/${env.JOB_NAME}/../cached_pipelines.txt"
     }
 
-    if (isHashTested(hash, hashFile)) {
-        echo "Hash ${hash} already saved in cache file."
-        return
+    // The default path goes through the job directory, so two jobs reach
+    // the same file through different strings
+    def lockName = "saveTestedHash:" +
+        java.nio.file.Paths.get(hashFile).normalize().toString()
+
+    lock(resource: lockName) {
+        if (isHashTested(hash, hashFile)) {
+            echo "Hash ${hash} already saved in cache file."
+            return
+        }
+
+        def hashes = fileExists(hashFile) ?
+            readFile(hashFile).split("\n") as List : []
+
+        if (hashes.size() >= maxHashes) {
+            hashes.remove(0)
+        }
+
+        hashes.add(hash)
+
+        writeFile(file: hashFile, text: hashes.join("\n"))
+        echo """
+            Saved new tested hash: ${hash}. \
+            Total hashes stored: ${hashes.size()}
+        """.stripIndent().trim()
     }
-
-    def hashes = fileExists(hashFile) ?
-        readFile(hashFile).split("\n") as List : []
-
-    if (hashes.size() >= maxHashes) {
-        hashes.remove(0)
-    }
-
-    hashes.add(hash)
-
-    writeFile(file: hashFile, text: hashes.join("\n"))
-    echo """
-        Saved new tested hash: ${hash}. \
-        Total hashes stored: ${hashes.size()}
-    """.stripIndent().trim()
 }
 

@@ -15,6 +15,7 @@ Install the following plugins from **Manage Jenkins** →
 3. **GitHub Plugin**
 4. **JIRA Pipeline Steps**
 5. **Mattermost Notification Plugin**
+6. **Lockable Resources Plugin** (used by `saveTestedHash()`)
 
 ### Required Credentials
 

@@ -409,7 +409,10 @@ if (isHashTested(hash)) {
 
 #### `saveTestedHash(String hash, String hashFile, Integer maxHashes)`
 
-Saves a tested hash to the cache file.
+Saves a tested hash to the cache file. The update runs inside a
+`lock()` on the cache file path, so concurrent stages or builds sharing
+the file do not lose each other's hashes (requires the Lockable
+Resources plugin).
 
 **Parameters**:
 - `hash` (String): Hash to save
