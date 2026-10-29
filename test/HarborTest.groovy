@@ -80,6 +80,22 @@ def a5 = [
 ]
 check('moving main protects its digest', Harbor.staleTags(a5, 'main-', 'main', 1), ['d2:main-b'])
 
+// 5b. byte-identical builds pile every tag onto the digest moving `main`
+//     points at: only the newest of them is protected
+def a5b = [
+    art('dSame', [['main-a', 't1'], ['main-b', 't2'], ['main', 't3'], ['main-c', 't3']], 't1'),
+]
+check('identical builds still pruned', Harbor.staleTags(a5b, 'main-', 'main', 1),
+    ['dSame:main-a', 'dSame:main-b'])
+
+// 5c. moving `main` parked on an old digest shared by several tags keeps
+//     only the newest of them
+def a5c = [
+    art('d3', [['main-c', 't3']], 't3'),
+    art('d1', [['main', 't2'], ['main-a', 't1'], ['main-b', 't2']], 't1'),
+]
+check('parked moving keeps one tag', Harbor.staleTags(a5c, 'main-', 'main', 1), ['d1:main-a'])
+
 // 6. keep larger than the history: nothing to do
 check('nothing stale', Harbor.staleTags(a1, 'main-', 'main', 10), [])
 

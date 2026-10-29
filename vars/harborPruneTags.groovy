@@ -8,8 +8,8 @@ import org.pipeline.Harbor
  * Housekeeping for jobs that push one tag per commit plus a moving tag
  * (`main-<commit>` and `main`). Every `<prefix>*` tag counts, including
  * one sharing its digest with a preview, a release or `latest`; those
- * other tags are never touched, and neither are the `<prefix>*` tags on
- * the digest the moving tag points at. Deletes tags, not artifacts, so two
+ * other tags are never touched, and neither is the newest `<prefix>*` tag
+ * on the digest the moving tag points at. Deletes tags, not artifacts, so two
  * commits sharing a byte-identical image do not take each other down;
  * retention is counted over tags and ordered by the push time of the tag
  * itself.

@@ -6,6 +6,16 @@ documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
+## [Unreleased]
+
+### Fixed
+- `harborPruneTags()` kept every `<prefix>*` tag on the digest the moving
+  tag points at. A target that comes out byte-identical commit after
+  commit (deitu-mbaas, whose build ignores the version build args) hangs
+  all its tags on that one digest, so none was ever pruned. Only the
+  newest `<prefix>*` tag on that digest is protected now; the rest count
+  towards `keep` like any other.
+
 ## [0.0.7]
 
 ### Fixed

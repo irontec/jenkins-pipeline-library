@@ -48,8 +48,11 @@ class Harbor implements Serializable {
      * its tag out of the count and keep it for as long as the release
      * lives. Other tags (a preview, a release, `latest`) are never
      * returned, so they and their artifact stay. Of the candidates the
-     * newest `keep` survive, and so does every one on the digest `<moving>`
-     * points at.
+     * newest `keep` survive, and so does the newest one on the digest
+     * `<moving>` points at. Only that one: builds that come out
+     * byte-identical commit after commit pile all their tags onto the
+     * digest `<moving>` points at, and protecting every one of them would
+     * never prune anything.
      *
      * Retention counts tags and orders them by the push time of the tag
      * itself, not of the artifact: the artifact keeps the push time of the
@@ -101,10 +104,13 @@ class Harbor implements Serializable {
         }
 
         int retained = 0
+        boolean movingKept = false
         for (int i = 0; i < candidates.size(); i++) {
             def candidate = candidates.get(i)
-            if (candidate.digest == movingDigest || retained < keep) {
+            boolean onMoving = candidate.digest == movingDigest
+            if (retained < keep || (onMoving && !movingKept)) {
                 retained++
+                movingKept = movingKept || onMoving
                 continue
             }
             stale.add([digest: candidate.digest, tag: candidate.tag])
