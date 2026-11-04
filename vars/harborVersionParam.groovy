@@ -16,8 +16,9 @@ import org.pipeline.Helpers
  *
  * With `current`, the parameter reacts to an environment and a tenant
  * parameter (see gitopsTenantParam()): it reads the version the selected
- * tenant has in its GitOps repository, labels it "(actual)" and
- * preselects it. If that file cannot be read, the list comes unmarked.
+ * tenant has in its GitOps repository and labels it "(actual)"; the newest
+ * version stays preselected, so an untouched form upgrades. If that file
+ * cannot be read, the list comes unmarked.
  *
  * @param args.name          String parameter name
  * @param args.repo          String repository inside the project
@@ -29,7 +30,8 @@ import org.pipeline.Helpers
  * @param args.credentialsId String Jenkins credentials, read access is
  *                           enough (default: env.HARBOR_CREDENTIALS_ID or
  *                           the library constant)
- * @param args.current       Map, optional, where the current version lives:
+ * @param args.current       Map, optional, where the current version lives,
+ *                           to label it:
  *                           environmentParam, tenantParam (parameter names),
  *                           repos (environment -> GitHub `owner/name`), dir
  *                           (directory of tenant directories), file (inside

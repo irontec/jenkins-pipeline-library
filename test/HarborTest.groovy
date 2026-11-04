@@ -166,13 +166,21 @@ def mark = { List versions, String current ->
 }
 def keysAndLabels = { Map m -> m.collect { k, v -> "${k}=${v}".toString() } }
 
-// 15b. the current version is labelled and preselected, order kept
+// 15b. the current version is labelled, the newest one preselected, order kept
 checkList('current in the list', keysAndLabels(mark(['0.10.0', '0.9.1', '0.9.0'], '0.9.1')),
-    ['0.10.0=0.10.0', '0.9.1=0.9.1 (actual):selected', '0.9.0=0.9.0'])
+    ['0.10.0=0.10.0:selected', '0.9.1=0.9.1 (actual)', '0.9.0=0.9.0'])
 
 // 15c. a current version missing from the listing is inserted in order
 checkList('current not listed', keysAndLabels(mark(['0.10.0', '0.9.0'], '0.9.5')),
-    ['0.10.0=0.10.0', '0.9.5=0.9.5 (actual):selected', '0.9.0=0.9.0'])
+    ['0.10.0=0.10.0:selected', '0.9.5=0.9.5 (actual)', '0.9.0=0.9.0'])
+
+// 15c2. the tenant already runs the newest: one entry carries both marks
+checkList('current is newest', keysAndLabels(mark(['0.10.0', '0.9.0'], '0.10.0')),
+    ['0.10.0=0.10.0 (actual):selected', '0.9.0=0.9.0'])
+
+// 15c3. a current version newer than anything listed goes on top, preselected
+checkList('current newer than listed', keysAndLabels(mark(['0.10.0', '0.9.0'], '0.11.0')),
+    ['0.11.0=0.11.0 (actual):selected', '0.10.0=0.10.0', '0.9.0=0.9.0'])
 
 // 15d. no current version: the plain list
 checkList('no current', mark(['0.10.0', '0.9.0'], null), ['0.10.0', '0.9.0'])

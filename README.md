@@ -537,7 +537,7 @@ signatures it uses (credentials lookup, `plainText`, `URL.openConnection`).
 - `description` (String, optional): Parameter description
 - `project`, `registry`, `credentialsId` (String, optional): See above
 - `current` (Map, optional): Where the version the selected tenant runs
-  lives, to label it "(actual)" and preselect it (see below)
+  lives, to label it "(actual)" (see below)
 
 **Returns**: `Map` - Parameter definition for `properties([parameters([...])])`
 
@@ -553,9 +553,11 @@ properties([parameters([
 **Current version**: with `current`, the parameter reacts to an
 environment and a tenant parameter, as `gitopsTenantParam()` declares
 them. It reads one YAML file of the selected tenant from GitHub and the
-scalar at a `.a.b.c` path in it; that version is labelled "(actual)" and
-preselected, and inserted in order if Harbor did not list it. When the
-file cannot be read the list comes unmarked. Keys of `current`:
+scalar at a `.a.b.c` path in it; that version is labelled "(actual)", and
+inserted in order if Harbor did not list it. The newest version stays
+preselected, as without `current`: the form is for upgrading, and what
+the tenant runs now is one click away in the list. When the file cannot
+be read the list comes unmarked. Keys of `current`:
 `environmentParam`, `tenantParam` (parameter names), `repos` (environment
 -> GitHub `owner/name`), `dir` (directory of tenant directories), `file`
 (inside the tenant directory), `path`, and optionally `ref` (default

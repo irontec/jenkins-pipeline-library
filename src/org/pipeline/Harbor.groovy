@@ -175,9 +175,11 @@ def markCurrent(List versions, String current) {
         all.add(pos, current)
     }
     // value -> label; Active Choices preselects a label ending in :selected.
+    // The newest one, on top, is preselected: the form is for upgrading.
     def choices = [:]
     all.each { version ->
-        choices[version] = version == current ? "${version} (actual):selected".toString() : version
+        String label = version == current ? "${version} (actual)" : version
+        choices[version] = (version == all[0] ? "${label}:selected" : label).toString()
     }
     return choices
 }
@@ -192,8 +194,8 @@ def markCurrent(List versions, String current) {
      * instead of an empty list.
      *
      * With currentSource (Gitops.currentValueSource()), the version it
-     * reads is marked as the current one and preselected; when it cannot
-     * be read the list comes unmarked.
+     * reads is labelled as the current one and the newest version is
+     * preselected; when it cannot be read the list comes unmarked.
      */
     @NonCPS
     static String versionChoicesScript(String registry, String project, String repo,
