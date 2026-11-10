@@ -48,6 +48,27 @@ class Helpers implements Serializable {
         return name
     }
 
+    /**
+     * Returns the GitHub repository being built as "owner/name".
+     *
+     * Read from CHANGE_URL on a pull request build
+     * (https://github.com/owner/name/pull/N) and from GIT_URL otherwise,
+     * in either its https or its ssh spelling, with or without ".git".
+     * Null when neither names a GitHub repository.
+     */
+    static String getGithubRepository(def env) {
+        for (String url : [env.CHANGE_URL, env.GIT_URL]) {
+            if (!url) {
+                continue
+            }
+            def m = url =~ /github\.com[\/:]([^\/]+)\/([^\/]+?)(?:\.git)?(?:\/.*)?$/
+            if (m.find()) {
+                return "${m.group(1)}/${m.group(2)}".toString()
+            }
+        }
+        return null
+    }
+
     static String getHarborRegistry(def env) {
         return env.HARBOR_REGISTRY ?: Constants.HARBOR_REGISTRY
     }

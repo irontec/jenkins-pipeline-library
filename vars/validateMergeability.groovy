@@ -4,7 +4,8 @@
  * Validates that a pull request is ready to be merged
  * 
  * Performs various checks including:
- * - Validates target branch
+ * - Validates target branch: main, or the head of another open pull
+ *   request when the pull request is stacked
  * - Checks if subtasks are completed
  * - Verifies feature branch is up to date
  * - Validates fix versions
@@ -185,13 +186,22 @@ private boolean validateTaskMergeability(
 
     echo "${jiraTicket} is a task. Checking subtasks..."
 
-    // Check target branch is main
+    // Check target branch is main, or the head of another open pull
+    // request: a stacked pull request merges with its stack, never alone
     if (env.CHANGE_TARGET != mainBranch) {
-        unstable """
-            Target branch ${env.CHANGE_TARGET} is not the main \
-            branch.
+        def parent = stackParentPullRequest()
+        if (!parent) {
+            unstable """
+                Target branch ${env.CHANGE_TARGET} is not the main \
+                branch.
+            """
+            return false
+        }
+        echo """
+            Target branch ${env.CHANGE_TARGET} is the head of pull \
+            request #${parent}: this pull request is stacked and \
+            merges with its stack.
         """
-        return false
     }
 
     // Check all subtasks are completed

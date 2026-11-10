@@ -297,6 +297,71 @@ if (ticket) {
 
 ---
 
+#### `githubListPullRequests(Map args)`
+
+Lists the pull requests of the repository being built, in one call to the
+GitHub REST API. Requires the HTTP Request and Pipeline Utility Steps
+plugins.
+
+**Parameters**:
+- `state` (String, optional): `open`, `closed` or `all` (default: `open`)
+- `base` (String, optional): Only pull requests targeting this branch
+- `head` (String, optional): Only pull requests whose head is this branch
+- `repository` (String, optional): `owner/name` (default: read from
+  `CHANGE_URL` or `GIT_URL`)
+- `credentialsId` (String, optional): Credentials ID
+  (default: env.GITHUB_CREDENTIALS)
+
+**Returns**: `List` - Pull requests as GitHub returns them, at most 100
+
+**Example**:
+```groovy
+def children = githubListPullRequests(base: env.BRANCH_NAME)
+echo "stacked on this branch: ${children*.number}"
+```
+
+---
+
+#### `stackedPullRequests()`
+
+Numbers of the open pull requests stacked on the one being built: those
+whose base is this build's branch. A stack merges in one action, so the
+tree that lands is the top's, and a pipeline can leave the test suites to
+the top when this list is not empty.
+
+**Returns**: `List<Integer>` - Pull request numbers, empty when none is
+stacked or the build is not a pull request
+
+**Example**:
+```groovy
+def children = stackedPullRequests()
+if (children) {
+    env.STACK_SKIP_TESTS = "true"
+    notifySuccessGithub(null, "Tests deferred to #${children.join(', #')}")
+}
+```
+
+---
+
+#### `stackParentPullRequest()`
+
+Number of the open pull request this one is stacked on: the one whose head
+is this build's target branch. `validateMergeability()` uses it to accept a
+task pull request whose target is not `main` when that target is itself a
+pull request.
+
+**Returns**: `Integer` - Pull request number, or `null`
+
+**Example**:
+```groovy
+def parent = stackParentPullRequest()
+if (parent) {
+    echo "stacked on #${parent}"
+}
+```
+
+---
+
 ### JIRA Integration
 
 #### `jiraUpdateCustomFields(String site, String jiraTicket)`

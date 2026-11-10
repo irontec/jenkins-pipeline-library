@@ -6,6 +6,24 @@ documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com),
 and this project adheres to [Semantic Versioning](https://semver.org).
 
+## [0.0.10]
+
+### Added
+- `githubListPullRequests()`, one GitHub REST call listing the repository's
+  pull requests filtered by state, base or head; and on top of it
+  `stackedPullRequests()`, the open pull requests whose base is the branch
+  being built, and `stackParentPullRequest()`, the open pull request whose
+  head is the target branch. A pipeline reads the first to leave the test
+  suites to the top of a stack of pull requests, which merges in one action.
+- `Helpers.getGithubRepository(env)`, the `owner/name` of the repository
+  being built, read from `CHANGE_URL` or `GIT_URL`.
+
+### Changed
+- `validateMergeability()` no longer blocks a task pull request whose
+  target is not `main` when that target is the head of another open pull
+  request: the pull request is stacked and merges with its stack, never
+  alone.
+
 ## [0.0.9]
 
 ### Fixed
@@ -43,7 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org).
 ### Added
 - `Helpers.getCurrentBranch(env)` and `Helpers.normalizeBranch(String)`.
 
-## [Unreleased]
+## [0.0.10]
 
 ### Added
 - `gitopsTenantParam()`: Active Choices build parameter, reactive on an
@@ -170,7 +188,7 @@ When making changes to the library:
 
 Example:
 ```markdown
-## [Unreleased]
+## [0.0.10]
 
 ### Added
 - New function `doSomething()` for doing something
